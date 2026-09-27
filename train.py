@@ -1,10 +1,7 @@
 """Train the face-identity CNN on data/me/ and data/not_me/.
 
-Fixes the original implement1.py training loop, which used
-CrossEntropyLoss with the *input image itself* as the label — that
-never converges to anything meaningful. This version does real binary
-classification (BCEWithLogitsLoss) with a proper train/validation split
-and reports validation accuracy every epoch.
+Real binary classification (BCEWithLogitsLoss) with a proper
+train/validation split, reporting validation accuracy every epoch.
 """
 
 import argparse

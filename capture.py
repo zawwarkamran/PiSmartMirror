@@ -1,8 +1,6 @@
 """Capture labeled, face-cropped training samples from a webcam.
 
-Replaces the original TakeImg() from implement1.py, which saved whole
-resized frames (background included) with no face localization. This
-version uses OpenCV's Haar cascade to find the face first, crops just
+Uses OpenCV's Haar cascade to find the face in each frame, crops just
 that region, and saves it into data/<label>/ for dataset.py to load.
 
 Usage:

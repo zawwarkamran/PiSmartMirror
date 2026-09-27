@@ -10,9 +10,8 @@ from model import IMG_SIZE
 class FaceDataset(Dataset):
     """Loads labeled face crops from data/me/*.jpg and data/not_me/*.jpg.
 
-    Label 1 = me, label 0 = not_me. Both folders are populated by capture.py;
-    neither is committed to this repo (see README — don't publish face photos
-    of yourself or anyone else into a public repo).
+    Label 1 = me, label 0 = not_me. Both folders are populated by capture.py
+    and gitignored — see README for why.
     """
 
     def __init__(self, root="data"):
