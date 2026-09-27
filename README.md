@@ -1,48 +1,63 @@
-# PiProjet — Smart Mirror Face ID
+# PiSmartMirror
 
-A side project from university: I wanted a mirror that could tell whether it
-was looking at me. Built for a Raspberry Pi with a webcam behind the glass.
+A side project from university: I wanted a mirror that could tell whether
+it was looking at me. Built for a Raspberry Pi with a webcam behind the
+glass.
 
 ## How it works
 
 ```
 webcam frame -> Haar cascade (find + crop the face) -> 64x64 crop
-             -> small CNN (mine, PyTorch) -> sigmoid -> me / not me
+             -> embedding CNN (mine, PyTorch) -> 128-d vector
+             -> nearest-neighbor match against enrolled people
 ```
 
 OpenCV's Haar cascade handles finding a face in the frame — no need to
-reinvent that part. The actual identification is a small CNN I wrote from
-scratch: three conv/batchnorm/relu/maxpool blocks feeding into a linear
-head, trained as a binary classifier.
+reinvent that part. The interesting part is how identification works.
 
-The original 2020 training loop had a bug — the loss function I was using
-didn't actually match what I was trying to do, so it wasn't learning
-anything real. Went back and fixed it: proper binary classification loss,
-a real train/validation split, and it now reports accuracy per epoch.
+The first version of this was a binary classifier: "is this me, yes/no."
+That doesn't scale — a real multi-person system would need a brand new
+classifier retrained from scratch for every new person added. So this
+version trains an **embedding model** instead, with triplet loss: pull
+same-person photos together in vector space, push different-person photos
+apart. Enrolling someone new is then just: take a few photos, compute
+their average embedding, store it — no retraining. Recognizing someone is
+a nearest-neighbor lookup against everyone enrolled so far. This is the
+same basic approach behind things like Face ID and Google Photos' face
+grouping (FaceNet, ArcFace).
+
+`model.py` is a small hand-written CNN — three conv/batchnorm/relu/maxpool
+blocks feeding a linear head, L2-normalized to a 128-d embedding. No
+pretrained backbone.
 
 ## Usage
 
 ```bash
 pip install -r requirements.txt
 
-# collect labeled face crops (repeat for both classes)
-python capture.py me --samples 40
-python capture.py not_me --samples 40
+# enroll at least 2 people (triplet loss needs a contrast to learn from)
+python enroll.py zawwar --samples 40
+python enroll.py alex --samples 40
 
-# train
-python train.py --epochs 15
+# train the embedding model + build the enrollment gallery
+python train.py --epochs 20
 
-# live demo — opens a window with a labeled bounding box
-python detect_live.py
+# live demo — opens a window that names each face it sees, or "unknown"
+python identify.py
 ```
+
+Adding person #3 later: `enroll.py`, then re-run `train.py`. The
+embedding model itself only needs retraining occasionally as more people
+join — the per-person gallery lookup is what actually scales for free.
 
 ## Data
 
 No `data/` folder is committed here on purpose — I'm not putting face
-photos of myself or anyone else into a public repo. `capture.py` writes to
-`data/me/` and `data/not_me/` locally; run it yourself to build a training
-set before running `train.py`.
+photos of myself or anyone else into a public repo. `enroll.py` writes to
+`data/<name>/` locally; run it yourself to build a training set before
+running `train.py`.
 
-Verified the pipeline runs correctly end-to-end with placeholder images
-before pushing this, so the code itself is solid — bring your own photos
-to get a real result.
+Verified the full pipeline — triplet training, gallery construction, and
+nearest-neighbor identification — end to end with placeholder images
+before pushing this, so the code itself is solid. Bring your own photos
+(and at least one other willing person) to get a real result.

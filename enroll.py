@@ -1,11 +1,12 @@
-"""Capture labeled, face-cropped training samples from a webcam.
+"""Enroll a new person: capture labeled, face-cropped photos from a webcam.
 
-Uses OpenCV's Haar cascade to find the face in each frame, crops just
-that region, and saves it into data/<label>/ for dataset.py to load.
+Any number of people can be enrolled this way — each gets their own
+data/<name>/ folder. Multiple people are what train.py needs to learn a
+useful embedding space (see README for why one person alone isn't enough).
 
 Usage:
-    python capture.py me --samples 40
-    python capture.py not_me --samples 40
+    python enroll.py zawwar --samples 40
+    python enroll.py alex --samples 40
 """
 
 import argparse
@@ -16,7 +17,7 @@ import cv2
 from model import IMG_SIZE
 
 
-def capture(label, samples=30, out_dir="data", camera=0):
+def enroll(name, samples=30, out_dir="data", camera=0):
     face_cascade = cv2.CascadeClassifier(
         cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
     )
@@ -24,7 +25,7 @@ def capture(label, samples=30, out_dir="data", camera=0):
     if not cap.isOpened():
         raise SystemExit("Could not open camera — is one connected/available?")
 
-    save_dir = os.path.join(out_dir, label)
+    save_dir = os.path.join(out_dir, name)
     os.makedirs(save_dir, exist_ok=True)
     existing = len([f for f in os.listdir(save_dir) if f.endswith(".jpg")])
 
@@ -40,7 +41,7 @@ def capture(label, samples=30, out_dir="data", camera=0):
         for (x, y, w, h) in faces:
             face_crop = frame[y:y + h, x:x + w]
             face_crop = cv2.resize(face_crop, (IMG_SIZE, IMG_SIZE))
-            path = os.path.join(save_dir, f"{label}_{existing + count}.jpg")
+            path = os.path.join(save_dir, f"{name}_{existing + count}.jpg")
             cv2.imwrite(path, face_crop)
             count += 1
             print(f"Saved {path} ({count}/{samples})")
@@ -51,8 +52,8 @@ def capture(label, samples=30, out_dir="data", camera=0):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("label", choices=["me", "not_me"], help="Class for these samples")
+    parser.add_argument("name", help="Person's name — becomes their data/<name>/ folder")
     parser.add_argument("--samples", type=int, default=30)
     parser.add_argument("--camera", type=int, default=0)
     args = parser.parse_args()
-    capture(args.label, samples=args.samples, camera=args.camera)
+    enroll(args.name, samples=args.samples, camera=args.camera)

@@ -1,14 +1,19 @@
+import torch.nn.functional as F
 import torch.nn as nn
 
 IMG_SIZE = 64
+EMBEDDING_DIM = 128
 
 
-class FaceIdentityCNN(nn.Module):
-    """Binary classifier: does a cropped face image belong to 'me' or not.
+class FaceEmbeddingCNN(nn.Module):
+    """Maps a 64x64 RGB face crop to a 128-d, L2-normalized embedding.
 
-    Takes a 64x64 RGB face crop (produced by the Haar-cascade localizer in
-    capture.py / detect_live.py) and outputs a single logit — pass it through
-    a sigmoid to get a probability, or feed it directly to BCEWithLogitsLoss.
+    Not a per-person classifier — this is trained so that embeddings from
+    the same person land close together in space, and different people
+    land far apart (triplet loss, see train.py). Recognizing a new person
+    at inference time is a nearest-neighbor lookup against enrolled
+    embeddings (identify.py), not a retrained classifier, so adding a new
+    user just means storing one more vector.
     """
 
     def __init__(self):
@@ -29,14 +34,15 @@ class FaceIdentityCNN(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(2),  # 16 -> 8
         )
-        self.classifier = nn.Sequential(
+        self.embed = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(128 * (IMG_SIZE // 8) * (IMG_SIZE // 8), 64),
+            nn.Linear(128 * (IMG_SIZE // 8) * (IMG_SIZE // 8), 256),
             nn.ReLU(),
             nn.Dropout(0.3),
-            nn.Linear(64, 1),
+            nn.Linear(256, EMBEDDING_DIM),
         )
 
     def forward(self, x):
         x = self.features(x)
-        return self.classifier(x)
+        x = self.embed(x)
+        return F.normalize(x, p=2, dim=1)
