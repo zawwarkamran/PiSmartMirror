@@ -282,7 +282,7 @@ footer{text-align:center;padding-top:20px;color:var(--ink-faint);font-size:12px;
     await faceapi.nets.tinyFaceDetector.loadFromUri("./weights");
 
     setStatus("Loading identity model…");
-    session = await ort.InferenceSession.create("./face_embedding.model.wasm");
+    session = await ort.InferenceSession.create("./face_embedding.model.wasm?v=2");
 
     setStatus("Requesting camera…");
     try {
