@@ -1,0 +1,301 @@
+<title>Smart Mirror Demo</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root{
+  --bg:#EEF0F1; --surface:#FFFFFF; --ink:#14181D; --ink-soft:#4B535C; --ink-faint:#7B838B;
+  --accent:#AE4E17; --accent-soft:#F1E3D8; --confirm:#1F6F63; --confirm-soft:#DDEBE8; --line:#D7DBDD;
+  --font-display:'Newsreader', Georgia, serif;
+  --font-body:'IBM Plex Sans', -apple-system, sans-serif;
+  --font-mono:'IBM Plex Mono', 'SFMono-Regular', monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1215; --surface:#181C20; --ink:#E9EBEC; --ink-soft:#A6ADB2; --ink-faint:#767D82;
+    --accent:#E2884E; --accent-soft:#3A2A1D; --confirm:#5FBBAA; --confirm-soft:#1C2E2A; --line:#2B3034;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1215; --surface:#181C20; --ink:#E9EBEC; --ink-soft:#A6ADB2; --ink-faint:#767D82;
+  --accent:#E2884E; --accent-soft:#3A2A1D; --confirm:#5FBBAA; --confirm-soft:#1C2E2A; --line:#2B3034;
+}
+*{box-sizing:border-box;}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.55;padding-inline:20px;padding-block:40px;}
+.wrap{max-width:640px;margin:0 auto;}
+h1{font-family:var(--font-display);font-style:italic;font-weight:500;font-size:clamp(1.8rem,6vw,2.4rem);margin:0 0 10px;text-wrap:balance;}
+p{margin:0;color:var(--ink-soft);}
+.lede{max-width:56ch;margin-bottom:20px;font-size:0.98rem;}
+.eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:8px;}
+
+.stage{position:relative;width:100%;max-width:480px;aspect-ratio:4/3;background:#000;border-radius:10px;overflow:hidden;margin:0 auto 16px;border:1px solid var(--line);}
+.stage video, .stage canvas{position:absolute;inset:0;width:100%;height:100%;}
+.stage video{object-fit:cover;}
+.stage canvas{pointer-events:none;}
+
+.status{font-family:var(--font-mono);font-size:12.5px;color:var(--ink-faint);text-align:center;margin-bottom:20px;min-height:1.4em;}
+
+.panel{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:18px;margin-bottom:16px;}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+input[type="text"]{
+  font-family:var(--font-body);font-size:14px;padding:9px 12px;border-radius:7px;
+  border:1px solid var(--line);background:var(--bg);color:var(--ink);flex:1;min-width:140px;
+}
+button{
+  font-family:var(--font-mono);font-size:13px;letter-spacing:0.02em;
+  background:var(--ink);color:var(--bg);border:none;padding:10px 16px;border-radius:7px;
+  cursor:pointer;
+}
+button.secondary{background:transparent;color:var(--ink-soft);border:1px solid var(--line);}
+button:disabled{opacity:0.5;cursor:not-allowed;}
+
+.enrolled-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+.enrolled-list span{
+  font-family:var(--font-mono);font-size:12px;border:1px solid var(--confirm);color:var(--confirm);
+  background:var(--confirm-soft);padding:4px 9px;border-radius:6px;
+}
+.empty-note{font-size:0.88rem;font-style:italic;color:var(--ink-faint);}
+
+.note{font-size:0.85rem;color:var(--ink-faint);margin-top:18px;}
+.note a{color:var(--accent);}
+footer{text-align:center;padding-top:20px;color:var(--ink-faint);font-size:12px;font-family:var(--font-mono);}
+</style>
+
+<div class="wrap">
+  <h1>Smart Mirror, in your browser</h1>
+  <p class="lede">
+    A live version of <a href="https://github.com/zawwarkamran/PiSmartMirror" target="_blank" rel="noopener">PiSmartMirror</a> —
+    the face-recognition model runs entirely client-side (ONNX Runtime Web).
+    Nothing you enroll or capture here is sent anywhere; it's stored only in this browser tab.
+  </p>
+
+  <div class="stage">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+  </div>
+  <div class="status" id="status">Loading models…</div>
+
+  <div class="panel">
+    <p class="eyebrow">Enroll</p>
+    <div class="row">
+      <input type="text" id="nameInput" placeholder="Your name" maxlength="24">
+      <button id="enrollBtn" disabled>Enroll me</button>
+      <button id="clearBtn" class="secondary">Clear all</button>
+    </div>
+    <div class="enrolled-list" id="enrolledList"><span class="empty-note">No one enrolled yet.</span></div>
+  </div>
+
+  <p class="note">
+    Trained on the classic AT&amp;T faces dataset (32 identities), validated at ~78% recognition
+    accuracy on people never seen during training — a real, if imperfect, small-scale result rather
+    than a production-grade system. Detection uses <a href="https://github.com/justadudewhohacks/face-api.js" target="_blank" rel="noopener">face-api.js</a>'s
+    pretrained detector to locate faces; the identity model is the one trained in the linked repo.
+  </p>
+
+  <footer>Part of <a href="https://github.com/zawwarkamran/PiSmartMirror" target="_blank" rel="noopener">zawwarkamran/PiSmartMirror</a></footer>
+</div>
+
+<script src="ort.min.js"></script>
+<script src="face-api.min.js"></script>
+<script>
+(function () {
+  const IMG_SIZE = 64;
+  const MATCH_THRESHOLD = 0.6;
+  const STORAGE_KEY = "piSmartMirror.enrollments";
+
+  const statusEl = document.getElementById("status");
+  const video = document.getElementById("video");
+  const overlay = document.getElementById("overlay");
+  const octx = overlay.getContext("2d");
+  const nameInput = document.getElementById("nameInput");
+  const enrollBtn = document.getElementById("enrollBtn");
+  const clearBtn = document.getElementById("clearBtn");
+  const enrolledListEl = document.getElementById("enrolledList");
+
+  let session = null;
+  let busy = false;
+  let latestDetectionBox = null;
+  let latestVideoFrameCanvas = null;
+
+  function setStatus(msg) { statusEl.textContent = msg; }
+
+  function loadGallery() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+  function saveGallery(gallery) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(gallery)); } catch (e) {}
+  }
+  function renderEnrolledList() {
+    const gallery = loadGallery();
+    const names = Object.keys(gallery);
+    enrolledListEl.innerHTML = "";
+    if (names.length === 0) {
+      enrolledListEl.innerHTML = '<span class="empty-note">No one enrolled yet.</span>';
+      return;
+    }
+    for (const name of names) {
+      const span = document.createElement("span");
+      span.textContent = name;
+      enrolledListEl.appendChild(span);
+    }
+  }
+
+  function cosineSim(a, b) {
+    let dot = 0;
+    for (let i = 0; i < a.length; i++) dot += a[i] * b[i];
+    return dot; // both are L2-normalized already
+  }
+
+  function identify(embedding, gallery) {
+    let bestName = null, bestScore = -1;
+    for (const name in gallery) {
+      const score = cosineSim(embedding, gallery[name]);
+      if (score > bestScore) { bestName = name; bestScore = score; }
+    }
+    if (bestScore >= MATCH_THRESHOLD) return { name: bestName, score: bestScore };
+    return { name: null, score: bestScore };
+  }
+
+  function cropToTensor(canvas, box) {
+    const crop = document.createElement("canvas");
+    crop.width = IMG_SIZE; crop.height = IMG_SIZE;
+    const cctx = crop.getContext("2d");
+    cctx.drawImage(canvas, box.x, box.y, box.width, box.height, 0, 0, IMG_SIZE, IMG_SIZE);
+    const imgData = cctx.getImageData(0, 0, IMG_SIZE, IMG_SIZE).data;
+
+    const chw = new Float32Array(3 * IMG_SIZE * IMG_SIZE);
+    const plane = IMG_SIZE * IMG_SIZE;
+    for (let p = 0; p < plane; p++) {
+      chw[p] = imgData[p * 4] / 255;               // R
+      chw[plane + p] = imgData[p * 4 + 1] / 255;    // G
+      chw[2 * plane + p] = imgData[p * 4 + 2] / 255; // B
+    }
+    return new ort.Tensor("float32", chw, [1, 3, IMG_SIZE, IMG_SIZE]);
+  }
+
+  async function embedCurrentFace() {
+    if (!latestDetectionBox || !latestVideoFrameCanvas) return null;
+    const tensor = cropToTensor(latestVideoFrameCanvas, latestDetectionBox);
+    const results = await session.run({ input: tensor });
+    return Array.from(results.embedding.data);
+  }
+
+  async function detectLoop() {
+    if (busy) return;
+    busy = true;
+    try {
+      const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions());
+      overlay.width = video.videoWidth; overlay.height = video.videoHeight;
+      octx.clearRect(0, 0, overlay.width, overlay.height);
+
+      if (detection) {
+        const box = detection.box;
+        latestDetectionBox = box;
+
+        const frameCanvas = document.createElement("canvas");
+        frameCanvas.width = video.videoWidth; frameCanvas.height = video.videoHeight;
+        frameCanvas.getContext("2d").drawImage(video, 0, 0);
+        latestVideoFrameCanvas = frameCanvas;
+
+        const embedding = await embedCurrentFace();
+        const gallery = loadGallery();
+        const hasGallery = Object.keys(gallery).length > 0;
+        const result = hasGallery ? identify(embedding, gallery) : { name: null, score: 0 };
+
+        const label = hasGallery
+          ? (result.name ? `${result.name} (${result.score.toFixed(2)})` : `unknown (${result.score.toFixed(2)})`)
+          : "face detected — enroll someone to start matching";
+        const color = result.name ? "#2ecc71" : "#ff6b6b";
+
+        octx.strokeStyle = color; octx.lineWidth = 3;
+        octx.strokeRect(box.x, box.y, box.width, box.height);
+        octx.font = "16px monospace";
+        octx.fillStyle = color;
+        octx.fillText(label, box.x, Math.max(16, box.y - 8));
+
+        enrollBtn.disabled = false;
+        setStatus(hasGallery ? "" : "Face detected. Enroll a name to start recognition.");
+      } else {
+        latestDetectionBox = null;
+        enrollBtn.disabled = true;
+        setStatus("No face detected — center your face in frame.");
+      }
+    } catch (e) {
+      setStatus("Detection error: " + e.message);
+    }
+    busy = false;
+  }
+
+  async function enroll() {
+    const name = nameInput.value.trim();
+    if (!name) { setStatus("Type a name first."); return; }
+    if (!latestDetectionBox) { setStatus("No face detected right now."); return; }
+
+    enrollBtn.disabled = true;
+    setStatus(`Enrolling ${name}… hold still`);
+
+    const samples = [];
+    for (let i = 0; i < 5; i++) {
+      const emb = await embedCurrentFace();
+      if (emb) samples.push(emb);
+      await new Promise((r) => setTimeout(r, 250));
+    }
+
+    if (samples.length === 0) {
+      setStatus("Couldn't capture — try again.");
+      enrollBtn.disabled = false;
+      return;
+    }
+
+    const dim = samples[0].length;
+    const avg = new Array(dim).fill(0);
+    for (const s of samples) for (let i = 0; i < dim; i++) avg[i] += s[i] / samples.length;
+    const norm = Math.sqrt(avg.reduce((sum, v) => sum + v * v, 0)) || 1;
+    const normalized = avg.map((v) => v / norm);
+
+    const gallery = loadGallery();
+    gallery[name] = normalized;
+    saveGallery(gallery);
+    renderEnrolledList();
+    nameInput.value = "";
+    setStatus(`Enrolled ${name}.`);
+    enrollBtn.disabled = false;
+  }
+
+  clearBtn.addEventListener("click", () => {
+    localStorage.removeItem(STORAGE_KEY);
+    renderEnrolledList();
+    setStatus("Cleared all enrollments.");
+  });
+  enrollBtn.addEventListener("click", enroll);
+
+  async function main() {
+    renderEnrolledList();
+
+    ort.env.wasm.wasmPaths = "./";
+    ort.env.wasm.numThreads = 1;
+    ort.env.wasm.simd = false;
+
+    setStatus("Loading face detector…");
+    await faceapi.nets.tinyFaceDetector.loadFromUri("./weights");
+
+    setStatus("Loading identity model…");
+    session = await ort.InferenceSession.create("./face_embedding.model.wasm");
+
+    setStatus("Requesting camera…");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360 } });
+      video.srcObject = stream;
+      await new Promise((r) => (video.onloadedmetadata = r));
+      setStatus("Ready.");
+      setInterval(detectLoop, 400);
+    } catch (e) {
+      setStatus("Camera access failed: " + e.message + " (this demo needs camera permission to work).");
+    }
+  }
+
+  main();
+})();
+</script>
